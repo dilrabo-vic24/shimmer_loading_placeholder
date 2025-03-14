@@ -15,7 +15,9 @@ Add the following to your `pubspec.yaml` file:
 
 ```yaml
 dependencies:
-  shimmer_package: latest_version
+  shimmer_package:
+    git:
+      url: https://github.com/dilrabo-vic24/shimmer_loading_placeholder.git
 ```
 
 Then, run:
@@ -29,7 +31,7 @@ flutter pub get
 Import the package:
 
 ```dart
-import 'package:shimmer_package/shimmer_package.dart';
+import 'package:shimmer_loading_placeholder_new1';
 ```
 
 Wrap your widget with `ShimmerEffect`:

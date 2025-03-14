@@ -7,51 +7,8 @@ library shimmer;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
-///
-/// An enum defines all supported directions of shimmer effect
-///
-/// * [ShimmerDirection.ltr] left to right direction
-/// * [ShimmerDirection.rtl] right to left direction
-/// * [ShimmerDirection.ttb] top to bottom direction
-/// * [ShimmerDirection.btt] bottom to top direction
-///
 enum ShimmerDirection { ltr, rtl, ttb, btt }
 
-///
-/// A widget renders shimmer effect over [child] widget tree.
-///
-/// [child] defines an area that shimmer effect blends on. You can build [child]
-/// from whatever [Widget] you like but there're some notices in order to get
-/// exact expected effect and get better rendering performance:
-///
-/// * Use static [Widget] (which is an instance of [StatelessWidget]).
-/// * [Widget] should be a solid color element. Every colors you set on these
-/// [Widget]s will be overridden by colors of [gradient].
-/// * Shimmer effect only affects to opaque areas of [child], transparent areas
-/// still stays transparent.
-///
-/// [period] controls the speed of shimmer effect. The default value is 1500
-/// milliseconds.
-///
-/// [direction] controls the direction of shimmer effect. The default value
-/// is [ShimmerDirection.ltr].
-///
-/// [gradient] controls colors of shimmer effect.
-///
-/// [loop] the number of animation loop, set value of `0` to make animation run
-/// forever.
-///
-/// [enabled] controls if shimmer effect is active. When set to false the animation
-/// is paused
-///
-///
-/// ## Pro tips:
-///
-/// * [child] should be made of basic and simple [Widget]s, such as [Container],
-/// [Row] and [Column], to avoid side effect.
-///
-/// * use one [Shimmer] to wrap list of [Widget]s instead of a list of many [Shimmer]s
-///
 @immutable
 class Shimmer extends StatefulWidget {
   final Widget child;
@@ -60,6 +17,7 @@ class Shimmer extends StatefulWidget {
   final Gradient gradient;
   final int loop;
   final bool enabled;
+  final double borderRadius;
 
   const Shimmer({
     super.key,
@@ -69,13 +27,9 @@ class Shimmer extends StatefulWidget {
     this.period = const Duration(milliseconds: 1500),
     this.loop = 0,
     this.enabled = true,
+    this.borderRadius = 0.0,
   });
 
-  ///
-  /// A convenient constructor provides an easy and convenient way to create a
-  /// [Shimmer] which [gradient] is [LinearGradient] made up of `baseColor` and
-  /// `highlightColor`.
-  ///
   Shimmer.fromColors({
     super.key,
     required this.child,
@@ -85,39 +39,22 @@ class Shimmer extends StatefulWidget {
     this.direction = ShimmerDirection.ltr,
     this.loop = 0,
     this.enabled = true,
+    this.borderRadius = 0.0,
   }) : gradient = LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.centerRight,
-            colors: <Color>[
-              baseColor,
-              baseColor,
-              highlightColor,
-              baseColor,
-              baseColor
-            ],
-            stops: const <double>[
-              0.0,
-              0.35,
-              0.5,
-              0.65,
-              1.0
-            ]);
+          begin: Alignment.topLeft,
+          end: Alignment.centerRight,
+          colors: <Color>[
+            baseColor,
+            baseColor,
+            highlightColor,
+            baseColor,
+            baseColor
+          ],
+          stops: const <double>[0.0, 0.35, 0.5, 0.65, 1.0],
+        );
 
   @override
   _ShimmerState createState() => _ShimmerState();
-
-  @override
-  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
-    super.debugFillProperties(properties);
-    properties.add(DiagnosticsProperty<Gradient>('gradient', gradient,
-        defaultValue: null));
-    properties.add(EnumProperty<ShimmerDirection>('direction', direction));
-    properties.add(
-        DiagnosticsProperty<Duration>('period', period, defaultValue: null));
-    properties
-        .add(DiagnosticsProperty<bool>('enabled', enabled, defaultValue: null));
-    properties.add(DiagnosticsProperty<int>('loop', loop, defaultValue: 0));
-  }
 }
 
 class _ShimmerState extends State<Shimmer> with SingleTickerProviderStateMixin {
@@ -128,7 +65,7 @@ class _ShimmerState extends State<Shimmer> with SingleTickerProviderStateMixin {
   void initState() {
     super.initState();
     _controller = AnimationController(vsync: this, duration: widget.period)
-      ..addStatusListener((AnimationStatus status) {
+      ..addStatusListener((status) {
         if (status != AnimationStatus.completed) {
           return;
         }
@@ -145,25 +82,18 @@ class _ShimmerState extends State<Shimmer> with SingleTickerProviderStateMixin {
   }
 
   @override
-  void didUpdateWidget(Shimmer oldWidget) {
-    if (widget.enabled) {
-      _controller.forward();
-    } else {
-      _controller.stop();
-    }
-    super.didUpdateWidget(oldWidget);
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      child: widget.child,
-      builder: (BuildContext context, Widget? child) => _Shimmer(
-        child: child,
-        direction: widget.direction,
-        gradient: widget.gradient,
-        percent: _controller.value,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(widget.borderRadius),
+      child: AnimatedBuilder(
+        animation: _controller,
+        child: widget.child,
+        builder: (context, child) => _Shimmer(
+          direction: widget.direction,
+          gradient: widget.gradient,
+          percent: _controller.value,
+          child: child,
+        ),
       ),
     );
   }
@@ -215,67 +145,102 @@ class _ShimmerFilter extends RenderProxyBox {
   bool get alwaysNeedsCompositing => child != null;
 
   set percent(double newValue) {
-    if (newValue == _percent) {
-      return;
-    }
+    if (newValue == _percent) return;
     _percent = newValue;
     markNeedsPaint();
   }
 
   set gradient(Gradient newValue) {
-    if (newValue == _gradient) {
-      return;
-    }
+    if (newValue == _gradient) return;
     _gradient = newValue;
     markNeedsPaint();
   }
 
   set direction(ShimmerDirection newDirection) {
-    if (newDirection == _direction) {
-      return;
-    }
+    if (newDirection == _direction) return;
     _direction = newDirection;
     markNeedsLayout();
   }
 
   @override
   void paint(PaintingContext context, Offset offset) {
-    if (child != null) {
-      assert(needsCompositing);
+    if (child == null) {
+      layer = null;
+      return;
+    }
 
-      final double width = child!.size.width;
-      final double height = child!.size.height;
-      Rect rect;
-      double dx, dy;
-      if (_direction == ShimmerDirection.rtl) {
+    final double width = child!.size.width;
+    final double height = child!.size.height;
+    Rect rect;
+    double dx, dy;
+
+    switch (_direction) {
+      case ShimmerDirection.rtl:
         dx = _offset(width, -width, _percent);
         dy = 0.0;
         rect = Rect.fromLTWH(dx - width, dy, 3 * width, height);
-      } else if (_direction == ShimmerDirection.ttb) {
+        break;
+      case ShimmerDirection.ttb:
         dx = 0.0;
         dy = _offset(-height, height, _percent);
         rect = Rect.fromLTWH(dx, dy - height, width, 3 * height);
-      } else if (_direction == ShimmerDirection.btt) {
+        break;
+      case ShimmerDirection.btt:
         dx = 0.0;
         dy = _offset(height, -height, _percent);
         rect = Rect.fromLTWH(dx, dy - height, width, 3 * height);
-      } else {
+        break;
+      default:
         dx = _offset(-width, width, _percent);
         dy = 0.0;
         rect = Rect.fromLTWH(dx - width, dy, 3 * width, height);
-      }
-      layer ??= ShaderMaskLayer();
-      layer!
-        ..shader = _gradient.createShader(rect)
-        ..maskRect = offset & size
-        ..blendMode = BlendMode.srcIn;
-      context.pushLayer(layer!, super.paint, offset);
-    } else {
-      layer = null;
+        break;
     }
+
+    layer ??= ShaderMaskLayer();
+    layer!
+      ..shader = _gradient.createShader(rect)
+      ..maskRect = offset & size
+      ..blendMode = BlendMode.srcIn;
+
+    context.pushLayer(layer!, super.paint, offset);
   }
 
   double _offset(double start, double end, double percent) {
     return start + (end - start) * percent;
+  }
+}
+
+///
+/// A simple shimmer container for easy usage
+///
+class ShimmerContainer extends StatelessWidget {
+  final Widget child;
+  final Color baseColor;
+  final Color highlightColor;
+  final Duration period;
+  final double borderRadius;
+  final ShimmerDirection direction;
+
+  const ShimmerContainer({
+    super.key,
+    required this.child,
+    this.baseColor = Colors.grey,
+    this.highlightColor = Colors.white,
+    this.period = const Duration(milliseconds: 1500),
+    this.borderRadius = 8.0,
+    this.direction = ShimmerDirection.ltr,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer.fromColors(
+      baseColor: baseColor,
+      highlightColor: highlightColor,
+      period: period,
+      borderRadius: borderRadius,
+      direction: direction,
+      child: child,
+    );
   }
 }
